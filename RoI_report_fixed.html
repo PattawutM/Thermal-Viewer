@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thermal + RGB Overlay Viewer</title>
+  <style>
+    :root {
+      --bg: #eef2f7;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #d8e0ea;
+      --soft: #f8fafc;
+      --dark: #020617;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --warning-bg: #fffbeb;
+      --warning-text: #92400e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .page {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .header, .card {
+      background: var(--card);
+      border-radius: 22px;
+      box-shadow: 0 1px 8px rgba(15, 23, 42, 0.08);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    h1, h2, p { margin: 0; }
+    h1 { font-size: 24px; }
+    h2 { font-size: 18px; margin-bottom: 14px; }
+    .subtitle { margin-top: 6px; color: var(--muted); font-size: 14px; }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+    }
+
+    .left, .right { display: flex; flex-direction: column; gap: 16px; }
+    .card { padding: 18px; }
+
+    .upload-box {
+      display: block;
+      border: 1px dashed var(--border);
+      background: var(--soft);
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .upload-box input { margin-top: 8px; width: 100%; }
+    .file-note { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; }
+
+    #rgbPreview {
+      display: none;
+      margin-top: 12px;
+      width: 100%;
+      max-height: 130px;
+      object-fit: contain;
+      border-radius: 14px;
+      background: #e2e8f0;
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    label.field {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    input[type="number"], input[type="text"], input[type="date"], select {
+      width: 100%;
+      margin-top: 6px;
+      padding: 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: white;
+      font-size: 14px;
+      outline: none;
+    }
+
+    input[type="number"]:focus, input[type="text"]:focus, input[type="date"]:focus, select:focus, textarea:focus { border-color: #94a3b8; }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--soft);
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .hint {
+      background: var(--soft);
+      border-radius: 14px;
+      padding: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      margin-bottom: 12px;
+    }
+
+    .warning {
+      display: none;
+      background: var(--warning-bg);
+      color: var(--warning-text);
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.45;
+      margin-top: 12px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      background: white;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    button.primary:hover { background: var(--primary-dark); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .header-actions, .button-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .full { width: 100%; }
+
+    .alignment-card .top-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .alignment-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .control label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 8px;
+    }
+
+    .pill {
+      background: var(--soft);
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    input[type="range"] { width: 100%; }
+
+    .canvas-card { padding: 0; overflow: hidden; }
+    .canvas-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .canvas-header p { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    .canvas-wrap {
+      background: var(--dark);
+      padding: 12px;
+    }
+
+    #overlayCanvas {
+      display: block;
+      width: 100%;
+      max-height: 78vh;
+      object-fit: contain;
+      border-radius: 16px;
+      background: black;
+      cursor: crosshair;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .metric {
+      background: var(--soft);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .metric-title {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-value {
+      margin-top: 6px;
+      font-weight: 700;
+      font-size: 17px;
+    }
+
+
+    .report-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .report-detail-grid .wide { grid-column: 1 / -1; }
+
+    textarea {
+      width: 100%;
+      margin-top: 6px;
+      padding: 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: white;
+      font-size: 14px;
+      font-family: Arial, Helvetica, sans-serif;
+      outline: none;
+      resize: vertical;
+      min-height: 72px;
+    }
+
+    .editable-cell-input, .editable-cell-textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 7px 8px;
+      font: inherit;
+      background: white;
+    }
+
+    .editable-cell-textarea {
+      min-height: 58px;
+      resize: vertical;
+    }
+
+    .report-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .report-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: white;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 920px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--soft);
+      color: #334155;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    tr.active-row { background: #eff6ff; }
+
+    .small-btn {
+      padding: 6px 9px;
+      font-size: 12px;
+      border-radius: 10px;
+    }
+
+    .danger { color: #b91c1c; }
+
+    .report-preview {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      background: var(--soft);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1100px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .alignment-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 640px) {
+      .header { flex-direction: column; align-items: flex-start; }
+      .row-2, .metrics, .report-detail-grid { grid-template-columns: 1fr; }
+      .alignment-grid { grid-template-columns: 1fr; }
+      .report-detail-grid .wide { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="header">
+      <div>
+        <h1>Thermal + RGB Overlay Viewer</h1>
+        <p class="subtitle">Upload a RAW thermal image and a matching RGB photo, then manually align the thermal layer for better visual inspection.</p>
+      </div>
+      <div class="header-actions">
+        <button id="resetTopBtn">Reset</button>
+        <button id="exportBtn" class="primary">Export PNG</button>
+      </div>
+    </section>
+
+    <main class="main-grid">
+      <section class="left">
+        <div class="card">
+          <h2>Files</h2>
+          <label class="upload-box">
+            <strong>RGB photo</strong>
+            <input id="rgbInput" type="file" accept="image/*" />
+            <span id="rgbName" class="file-note">No RGB image selected</span>
+            <img id="rgbPreview" alt="RGB preview" />
+          </label>
+          <label class="upload-box">
+            <strong>RAW thermal file</strong>
+            <input id="rawInput" type="file" accept=".raw,.bin,*/*" />
+            <span id="rawInfo" class="file-note">Upload a RAW thermal file to begin.</span>
+          </label>
+        </div>
+
+        <div class="card">
+          <h2>RAW Settings</h2>
+          <div class="row-2">
+            <label class="field">Width<input id="rawWidth" type="number" value="640" /></label>
+            <label class="field">Height<input id="rawHeight" type="number" value="512" /></label>
+          </div>
+          <div class="row-2">
+            <label class="field">Data type
+              <select id="rawType">
+                <option value="float32">Float32</option>
+                <option value="uint16" selected>UInt16</option>
+                <option value="int16">Int16</option>
+                <option value="uint8">UInt8</option>
+              </select>
+            </label>
+            <label class="field">Endian
+              <select id="endian">
+                <option value="little">Little endian</option>
+                <option value="big" selected>Big endian</option>
+              </select>
+            </label>
+          </div>
+          <div class="row-2">
+            <label class="field">Scale<input id="tempScale" type="number" step="0.001" value="0.1" /></label>
+            <label class="field">Offset / Kelvin correction<input id="tempOffset" type="number" step="0.1" value="-273" /></label>
+          </div>
+          <p class="hint">
+            Expected size: <b id="expectedBytes">655,360</b> bytes. Uploaded file size: <b id="uploadedBytes">—</b> bytes. The Spot CAM IR RAW sample is typically 640 × 512 UInt16. Big endian and scale 0.1 are used by default. Kelvin-to-Celsius conversion is applied as value × 0.1 − 273 by default.
+          </p>
+          <button id="parseBtn" class="primary full" disabled>Load / Re-parse Thermal Data</button>
+          <p id="sizeWarning" class="warning">File size does not match the current RAW settings. Thermal data will not load until width, height, and data type match the file size.</p>
+        </div>
+
+        <div class="card">
+          <h2>Thermal Display</h2>
+          <div class="row-2">
+            <label class="field">Color map
+              <select id="colormap">
+                <option value="iron" selected>Iron</option>
+                <option value="inferno">Inferno</option>
+                <option value="rainbow">Rainbow</option>
+                <option value="gray">Gray</option>
+              </select>
+            </label>
+            <label class="field">Blend mode
+              <select id="blendMode">
+                <option value="source-over" selected>Normal</option>
+                <option value="screen">Screen</option>
+                <option value="multiply">Multiply</option>
+                <option value="overlay">Overlay</option>
+                <option value="lighter">Lighter</option>
+              </select>
+            </label>
+          </div>
+          <label class="check-row">Invert color map<input id="invertMap" type="checkbox" /></label>
+          <label class="check-row">Manual temperature range<input id="manualRange" type="checkbox" /></label>
+          <div class="row-2">
+            <label class="field">Range min<input id="rangeMin" type="number" step="0.1" value="20" /></label>
+            <label class="field">Range max<input id="rangeMax" type="number" step="0.1" value="80" /></label>
+          </div>
+          <p class="file-note">Data min/max: <span id="dataMinMax">0.00 / 100.00</span></p>
+        </div>
+      </section>
+
+      <section class="right">
+        <div class="card alignment-card">
+          <div class="top-line">
+            <h2>Manual Alignment</h2>
+            <button id="resetAlignBtn">Reset</button>
+          </div>
+          <div class="alignment-grid">
+            <div class="control"><label>Opacity <span id="opacityValue" class="pill">55%</span></label><input id="opacity" type="range" min="0" max="100" step="1" value="55" /></div>
+            <div class="control"><label>X offset <span id="txValue" class="pill">0px</span></label><input id="tx" type="range" min="-800" max="800" step="1" value="0" /></div>
+            <div class="control"><label>Y offset <span id="tyValue" class="pill">0px</span></label><input id="ty" type="range" min="-800" max="800" step="1" value="0" /></div>
+            <div class="control"><label>Scale <span id="scaleOverlayValue" class="pill">300%</span></label><input id="scaleOverlay" type="range" min="10" max="800" step="1" value="300" /></div>
+            <div class="control"><label>Rotation <span id="rotationValue" class="pill">0°</span></label><input id="rotation" type="range" min="-30" max="30" step="0.1" value="0" /></div>
+          </div>
+          <div class="alignment-grid">
+            <div class="control"><label>Lens K1 <span id="lensK1Value" class="pill">0.0000</span></label><input id="lensK1" type="range" min="-0.2" max="0.2" step="0.0001" value="0" /></div>
+            <div class="control"><label>Lens K2 <span id="lensK2Value" class="pill">-0.0230</span></label><input id="lensK2" type="range" min="-0.2" max="0.2" step="0.0001" value="-0.0230" /></div>
+            <div class="control"><label>Center X <span id="lensCxValue" class="pill">50%</span></label><input id="lensCx" type="range" min="0" max="100" step="1" value="50" /></div>
+            <div class="control"><label>Center Y <span id="lensCyValue" class="pill">50%</span></label><input id="lensCy" type="range" min="0" max="100" step="1" value="50" /></div>
+            <div class="control"><label>Warp quality <span class="pill">thermal</span></label><button id="resetLensBtn" class="full">Reset lens</button></div>
+          </div>
+          <p class="file-note">Lens K1/K2 apply radial distortion correction to the thermal layer before overlay. The slider range is limited to ±0.2 with fine 0.0001 steps for precise adjustment. Use small values first, for example ±0.005 to ±0.05.</p>
+          <button id="toggleThermalBtn" class="full">Hide thermal layer</button>
+        </div>
+
+        <div class="card canvas-card">
+          <div class="canvas-header">
+            <div>
+              <h2>Overlay Canvas</h2>
+              <p>Drag on the image to create multiple ROIs. Select an ROI when needed, or deselect it to keep all ROI overlays in the same style. Use the report table to control marker visibility for each ROI.</p>
+            </div>
+            <div class="button-row">
+              <button id="deselectRoiBtn">Deselect ROI</button>
+              <button id="deleteRoiBtn">Delete selected ROI</button>
+              <button id="clearRoiBtn">Clear all ROI</button>
+            </div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="overlayCanvas"></canvas>
+          </div>
+        </div>
+
+        <div class="card metrics">
+          <div class="metric"><div class="metric-title">Thermal data</div><div id="thermalMetric" class="metric-value">Not loaded</div></div>
+          <div class="metric"><div class="metric-title">Temperature range</div><div id="rangeMetric" class="metric-value">20.0 to 80.0 °C</div></div>
+          <div class="metric"><div class="metric-title">ROI min</div><div id="roiMinMetric" class="metric-value">Select ROI</div><div id="roiMinLocMetric" class="file-note">—</div></div>
+          <div class="metric"><div class="metric-title">ROI avg</div><div id="roiAvgMetric" class="metric-value">Select ROI</div></div>
+          <div class="metric"><div class="metric-title">ROI max</div><div id="roiMaxMetric" class="metric-value">Select ROI</div><div id="roiMaxLocMetric" class="file-note">—</div></div>
+          <div class="metric"><div class="metric-title">ROI samples</div><div id="roiSampleMetric" class="metric-value">Select ROI</div></div>
+        </div>
+
+        <div class="card">
+          <h2>Report</h2>
+          <p class="hint">Draw multiple ROI boxes on the overlay canvas. You can deselect ROI so every overlay box uses the same color, and you can control whether each ROI shows its MIN and MAX marker on the canvas.</p>
+          <div class="report-detail-grid">
+            <label class="field">Report title<input id="reportTitle" type="text" value="Thermal + RGB ROI Inspection Report" /></label>
+            <label class="field">Inspection date<input id="reportDate" type="date" /></label>
+            <label class="field">Inspector<input id="reportInspector" type="text" placeholder="Name / Team" /></label>
+            <label class="field">Asset / Equipment<input id="reportAsset" type="text" placeholder="Equipment name or tag" /></label>
+            <label class="field">Location<input id="reportLocation" type="text" placeholder="Site / area" /></label>
+            <label class="field">Reference<input id="reportReference" type="text" placeholder="Job no., mission no., etc." /></label>
+            <label class="field wide">Report summary / general comment<textarea id="reportComment" placeholder="Add overall observation, inspection condition, recommendation, or limitation"></textarea></label>
+          </div>
+          <div class="report-actions">
+            <button id="refreshReportBtn">Refresh report</button>
+            <button id="exportReportHtmlBtn" class="primary">Export HTML Report</button>
+            <button id="printReportBtn">Print / Save PDF</button>
+          </div>
+          <div class="report-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ROI</th>
+                  <th>Min</th>
+                  <th>Avg</th>
+                  <th>Max</th>
+                  <th>Samples</th>
+                  <th>Min location</th>
+                  <th>Max location</th>
+                  <th>Size</th>
+                  <th>Show MIN</th>
+                  <th>Show MAX</th>
+                  <th>Observation / Comment</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="roiTableBody">
+                <tr><td colspan="12">No ROI yet. Draw an ROI on the overlay canvas.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="reportPreview" class="report-preview">Report preview will update after ROI is drawn.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const state = {
+      rgbImage: null,
+      rawBuffer: null,
+      rawName: "",
+      thermalData: null,
+      dataMin: 0,
+      dataMax: 100,
+      thermalVisible: true,
+      rois: [],
+      activeRoiId: null,
+      nextRoiId: 1,
+      report: {
+        title: "Thermal + RGB ROI Inspection Report",
+        date: "",
+        inspector: "",
+        asset: "",
+        location: "",
+        reference: "",
+        comment: ""
+      },
+      isDrawing: false,
+      drawStart: null,
+      thermalCanvas: document.createElement("canvas")
+    };
+
+    const el = {
+      canvas: document.getElementById("overlayCanvas"),
+      rgbInput: document.getElementById("rgbInput"),
+      rawInput: document.getElementById("rawInput"),
+      rgbName: document.getElementById("rgbName"),
+      rawInfo: document.getElementById("rawInfo"),
+      rgbPreview: document.getElementById("rgbPreview"),
+      rawWidth: document.getElementById("rawWidth"),
+      rawHeight: document.getElementById("rawHeight"),
+      rawType: document.getElementById("rawType"),
+      endian: document.getElementById("endian"),
+      tempScale: document.getElementById("tempScale"),
+      tempOffset: document.getElementById("tempOffset"),
+      expectedBytes: document.getElementById("expectedBytes"),
+      uploadedBytes: document.getElementById("uploadedBytes"),
+      parseBtn: document.getElementById("parseBtn"),
+      sizeWarning: document.getElementById("sizeWarning"),
+      colormap: document.getElementById("colormap"),
+      blendMode: document.getElementById("blendMode"),
+      invertMap: document.getElementById("invertMap"),
+      manualRange: document.getElementById("manualRange"),
+      rangeMin: document.getElementById("rangeMin"),
+      rangeMax: document.getElementById("rangeMax"),
+      dataMinMax: document.getElementById("dataMinMax"),
+      opacity: document.getElementById("opacity"),
+      tx: document.getElementById("tx"),
+      ty: document.getElementById("ty"),
+      scaleOverlay: document.getElementById("scaleOverlay"),
+      rotation: document.getElementById("rotation"),
+      lensK1: document.getElementById("lensK1"),
+      lensK2: document.getElementById("lensK2"),
+      lensCx: document.getElementById("lensCx"),
+      lensCy: document.getElementById("lensCy"),
+      opacityValue: document.getElementById("opacityValue"),
+      txValue: document.getElementById("txValue"),
+      tyValue: document.getElementById("tyValue"),
+      scaleOverlayValue: document.getElementById("scaleOverlayValue"),
+      rotationValue: document.getElementById("rotationValue"),
+      lensK1Value: document.getElementById("lensK1Value"),
+      lensK2Value: document.getElementById("lensK2Value"),
+      lensCxValue: document.getElementById("lensCxValue"),
+      lensCyValue: document.getElementById("lensCyValue"),
+      toggleThermalBtn: document.getElementById("toggleThermalBtn"),
+      clearRoiBtn: document.getElementById("clearRoiBtn"),
+      deselectRoiBtn: document.getElementById("deselectRoiBtn"),
+      deleteRoiBtn: document.getElementById("deleteRoiBtn"),
+      refreshReportBtn: document.getElementById("refreshReportBtn"),
+      exportReportHtmlBtn: document.getElementById("exportReportHtmlBtn"),
+      printReportBtn: document.getElementById("printReportBtn"),
+      roiTableBody: document.getElementById("roiTableBody"),
+      reportPreview: document.getElementById("reportPreview"),
+      reportTitle: document.getElementById("reportTitle"),
+      reportDate: document.getElementById("reportDate"),
+      reportInspector: document.getElementById("reportInspector"),
+      reportAsset: document.getElementById("reportAsset"),
+      reportLocation: document.getElementById("reportLocation"),
+      reportReference: document.getElementById("reportReference"),
+      reportComment: document.getElementById("reportComment"),
+      exportBtn: document.getElementById("exportBtn"),
+      resetTopBtn: document.getElementById("resetTopBtn"),
+      resetAlignBtn: document.getElementById("resetAlignBtn"),
+      resetLensBtn: document.getElementById("resetLensBtn"),
+      thermalMetric: document.getElementById("thermalMetric"),
+      rangeMetric: document.getElementById("rangeMetric"),
+      roiMinMetric: document.getElementById("roiMinMetric"),
+      roiMinLocMetric: document.getElementById("roiMinLocMetric"),
+      roiAvgMetric: document.getElementById("roiAvgMetric"),
+      roiMaxMetric: document.getElementById("roiMaxMetric"),
+      roiMaxLocMetric: document.getElementById("roiMaxLocMetric"),
+      roiSampleMetric: document.getElementById("roiSampleMetric")
+    };
+
+    function n(input) { return Number(input.value); }
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function formatBytes(x) { return x ? x.toLocaleString() : "—"; }
+
+    function bytesPerPixel(type) {
+      if (type === "uint8") return 1;
+      if (type === "uint16" || type === "int16") return 2;
+      return 4;
+    }
+
+    function getExpectedBytes() {
+      return n(el.rawWidth) * n(el.rawHeight) * bytesPerPixel(el.rawType.value);
+    }
+
+    function updateFileSizeUi() {
+      const expected = getExpectedBytes();
+      const uploaded = state.rawBuffer ? state.rawBuffer.byteLength : 0;
+      el.expectedBytes.textContent = expected.toLocaleString();
+      el.uploadedBytes.textContent = formatBytes(uploaded);
+      el.parseBtn.disabled = !state.rawBuffer;
+      el.sizeWarning.style.display = state.rawBuffer && expected !== uploaded ? "block" : "none";
+    }
+
+    function detectRawSettings(byteLength) {
+      const formats = [
+        { width: 640, height: 512, type: "uint16", bytes: 640 * 512 * 2 },
+        { width: 320, height: 256, type: "uint16", bytes: 320 * 256 * 2 },
+        { width: 640, height: 512, type: "float32", bytes: 640 * 512 * 4 },
+        { width: 320, height: 256, type: "float32", bytes: 320 * 256 * 4 },
+        { width: 256, height: 192, type: "uint16", bytes: 256 * 192 * 2 },
+        { width: 160, height: 120, type: "uint16", bytes: 160 * 120 * 2 }
+      ];
+      return formats.find(f => f.bytes === byteLength) || null;
+    }
+
+    function getColor(t) {
+      let x = clamp(t, 0, 1);
+      if (el.invertMap.checked) x = 1 - x;
+
+      if (el.colormap.value === "gray") {
+        const g = Math.round(x * 255);
+        return [g, g, g];
+      }
+
+      if (el.colormap.value === "inferno") {
+        const r = Math.round(255 * Math.min(1, 1.9 * x));
+        const g = Math.round(255 * Math.max(0, Math.min(1, 1.8 * x - 0.35)));
+        const b = Math.round(255 * Math.max(0, Math.min(1, 1.5 * x - 0.85)));
+        return [r, g, b];
+      }
+
+      if (el.colormap.value === "rainbow") {
+        const a = (1 - x) * 4;
+        const r = Math.round(255 * clamp(Math.min(a - 1.5, -a + 4.5), 0, 1));
+        const g = Math.round(255 * clamp(Math.min(a - 0.5, -a + 3.5), 0, 1));
+        const b = Math.round(255 * clamp(Math.min(a + 0.5, -a + 2.5), 0, 1));
+        return [r, g, b];
+      }
+
+      const stops = [
+        [0.0, [0, 0, 0]],
+        [0.2, [80, 0, 110]],
+        [0.42, [190, 30, 40]],
+        [0.68, [255, 140, 20]],
+        [0.86, [255, 230, 80]],
+        [1.0, [255, 255, 255]]
+      ];
+
+      for (let i = 0; i < stops.length - 1; i++) {
+        const [p0, c0] = stops[i];
+        const [p1, c1] = stops[i + 1];
+        if (x >= p0 && x <= p1) {
+          const f = (x - p0) / (p1 - p0);
+          return [
+            Math.round(c0[0] + (c1[0] - c0[0]) * f),
+            Math.round(c0[1] + (c1[1] - c0[1]) * f),
+            Math.round(c0[2] + (c1[2] - c0[2]) * f)
+          ];
+        }
+      }
+      return [255, 255, 255];
+    }
+
+    function parseRaw(bufferOverride) {
+      const buffer = bufferOverride || state.rawBuffer;
+      if (!buffer) {
+        alert("Please upload a RAW thermal file first.");
+        return;
+      }
+
+      const width = n(el.rawWidth);
+      const height = n(el.rawHeight);
+      const type = el.rawType.value;
+      const requiredBytes = width * height * bytesPerPixel(type);
+
+      if (requiredBytes > buffer.byteLength) {
+        alert(`The selected settings expect ${requiredBytes.toLocaleString()} bytes, but the file has only ${buffer.byteLength.toLocaleString()} bytes. Check width, height, or data type.`);
+        return;
+      }
+
+      const view = new DataView(buffer);
+      const little = el.endian.value === "little";
+      const scale = Number(el.tempScale.value || 1);
+      const offset = Number(el.tempOffset.value || 0);
+      const count = width * height;
+      const values = new Float32Array(count);
+      let min = Infinity;
+      let max = -Infinity;
+
+      for (let i = 0; i < count; i++) {
+        const p = type === "uint8" ? i : (type === "uint16" || type === "int16" ? i * 2 : i * 4);
+        let v;
+        if (type === "uint8") v = view.getUint8(p);
+        else if (type === "uint16") v = view.getUint16(p, little);
+        else if (type === "int16") v = view.getInt16(p, little);
+        else v = view.getFloat32(p, little);
+        v = v * scale + offset;
+        values[i] = v;
+        if (Number.isFinite(v)) {
+          min = Math.min(min, v);
+          max = Math.max(max, v);
+        }
+      }
+
+      state.thermalData = values;
+      state.dataMin = min;
+      state.dataMax = max;
+
+      if (!el.manualRange.checked) {
+        el.rangeMin.value = min.toFixed(2);
+        el.rangeMax.value = max.toFixed(2);
+      }
+
+      updateUi();
+      draw();
+    }
+
+    function createThermalBitmap() {
+      if (!state.thermalData) return null;
+      const width = n(el.rawWidth);
+      const height = n(el.rawHeight);
+      const cnv = state.thermalCanvas;
+      cnv.width = width;
+      cnv.height = height;
+      const ctx = cnv.getContext("2d");
+      const imageData = ctx.createImageData(width, height);
+      const min = n(el.rangeMin);
+      const max = n(el.rangeMax);
+      const span = Math.max(0.000001, max - min);
+
+      for (let i = 0; i < state.thermalData.length; i++) {
+        const t = (state.thermalData[i] - min) / span;
+        const [r, g, b] = getColor(t);
+        const j = i * 4;
+        imageData.data[j] = r;
+        imageData.data[j + 1] = g;
+        imageData.data[j + 2] = b;
+        imageData.data[j + 3] = 255;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      return applyLensDistortion(cnv);
+    }
+
+    function applyLensDistortion(sourceCanvas) {
+      const k1 = Number(el.lensK1.value || 0);
+      const k2 = Number(el.lensK2.value || 0);
+      const cxNorm = Number(el.lensCx.value || 50) / 100;
+      const cyNorm = Number(el.lensCy.value || 50) / 100;
+      if (Math.abs(k1) < 0.000001 && Math.abs(k2) < 0.000001 && cxNorm === 0.5 && cyNorm === 0.5) {
+        return sourceCanvas;
+      }
+
+      const width = sourceCanvas.width;
+      const height = sourceCanvas.height;
+      const srcCtx = sourceCanvas.getContext("2d");
+      const src = srcCtx.getImageData(0, 0, width, height);
+      const out = document.createElement("canvas");
+      out.width = width;
+      out.height = height;
+      const outCtx = out.getContext("2d");
+      const dst = outCtx.createImageData(width, height);
+
+      const cx = width * cxNorm;
+      const cy = height * cyNorm;
+      const radius = Math.min(width, height) / 2;
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const xn = (x - cx) / radius;
+          const yn = (y - cy) / radius;
+          const r2 = xn * xn + yn * yn;
+          const factor = 1 + k1 * r2 + k2 * r2 * r2;
+          const sx = Math.round(cx + xn * factor * radius);
+          const sy = Math.round(cy + yn * factor * radius);
+          const di = (y * width + x) * 4;
+
+          if (sx >= 0 && sy >= 0 && sx < width && sy < height) {
+            const si = (sy * width + sx) * 4;
+            dst.data[di] = src.data[si];
+            dst.data[di + 1] = src.data[si + 1];
+            dst.data[di + 2] = src.data[si + 2];
+            dst.data[di + 3] = src.data[si + 3];
+          } else {
+            dst.data[di + 3] = 0;
+          }
+        }
+      }
+
+      outCtx.putImageData(dst, 0, 0);
+      return out;
+    }
+
+    function draw() {
+      const canvas = el.canvas;
+      const ctx = canvas.getContext("2d");
+      const w = state.rgbImage ? state.rgbImage.naturalWidth : 1280;
+      const h = state.rgbImage ? state.rgbImage.naturalHeight : 720;
+
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.aspectRatio = `${w} / ${h}`;
+      ctx.clearRect(0, 0, w, h);
+
+      if (state.rgbImage) {
+        ctx.drawImage(state.rgbImage, 0, 0, w, h);
+      } else {
+        ctx.fillStyle = "#111827";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#e5e7eb";
+        ctx.font = "24px Arial";
+        ctx.fillText("Upload RGB photo and RAW thermal file", 32, 56);
+      }
+
+      const thermalBitmap = createThermalBitmap();
+      if (thermalBitmap && state.thermalVisible) {
+        ctx.save();
+        ctx.globalAlpha = n(el.opacity) / 100;
+        ctx.globalCompositeOperation = el.blendMode.value;
+        const s = n(el.scaleOverlay) / 100;
+        const cx = w / 2 + n(el.tx);
+        const cy = h / 2 + n(el.ty);
+        ctx.translate(cx, cy);
+        ctx.rotate((n(el.rotation) * Math.PI) / 180);
+        ctx.scale(s, s);
+        ctx.drawImage(thermalBitmap, -n(el.rawWidth) / 2, -n(el.rawHeight) / 2, n(el.rawWidth), n(el.rawHeight));
+        ctx.restore();
+      }
+
+      state.rois.forEach(roi => {
+        const isActive = roi.id === state.activeRoiId;
+        const hasSelection = state.activeRoiId !== null;
+        const stats = getRoiStats(roi);
+        ctx.save();
+        ctx.strokeStyle = isActive ? "#f59e0b" : "#22c55e";
+        ctx.lineWidth = isActive ? 4 : 3;
+        ctx.setLineDash(hasSelection ? (isActive ? [] : [8, 5]) : []);
+        ctx.strokeRect(roi.x, roi.y, roi.w, roi.h);
+        ctx.fillStyle = isActive ? "rgba(245,158,11,0.16)" : "rgba(34,197,94,0.12)";
+        ctx.fillRect(roi.x, roi.y, roi.w, roi.h);
+        ctx.fillStyle = isActive ? "#451a03" : "#052e16";
+        ctx.fillRect(roi.x, Math.max(0, roi.y - 30), 390, 26);
+        ctx.fillStyle = isActive ? "#ffedd5" : "#dcfce7";
+        ctx.font = "16px Arial";
+        ctx.fillText(getRoiText(roi, stats), roi.x + 8, Math.max(18, roi.y - 11));
+        ctx.restore();
+
+        if (stats) {
+          if (roi.showMin !== false) {
+            drawTemperatureMarker(ctx, stats.minImagePoint.x, stats.minImagePoint.y, "MIN", stats.min, "#2563eb");
+          }
+          if (roi.showMax !== false) {
+            drawTemperatureMarker(ctx, stats.maxImagePoint.x, stats.maxImagePoint.y, "MAX", stats.max, "#ef4444");
+          }
+        }
+      });
+
+      updateUi();
+    }
+
+    function drawTemperatureMarker(ctx, x, y, label, value, color) {
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 3;
+
+      ctx.beginPath();
+      ctx.arc(x, y, 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - 14, y);
+      ctx.lineTo(x + 14, y);
+      ctx.moveTo(x, y - 14);
+      ctx.lineTo(x, y + 14);
+      ctx.stroke();
+
+      const text = `${label} ${value.toFixed(1)}°C`;
+      ctx.font = "bold 14px Arial";
+      const textWidth = ctx.measureText(text).width;
+      const boxX = clamp(x + 12, 4, ctx.canvas.width - textWidth - 20);
+      const boxY = clamp(y - 30, 4, ctx.canvas.height - 24);
+      ctx.fillRect(boxX, boxY, textWidth + 16, 24);
+      ctx.fillStyle = "white";
+      ctx.fillText(text, boxX + 8, boxY + 17);
+      ctx.restore();
+    }
+
+    function getCanvasPoint(event) {
+      const rect = el.canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) * (el.canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (el.canvas.height / rect.height)
+      };
+    }
+
+    function imageToThermalPoint(x, y) {
+      const w = el.canvas.width;
+      const h = el.canvas.height;
+      const s = n(el.scaleOverlay) / 100;
+      const cx = w / 2 + n(el.tx);
+      const cy = h / 2 + n(el.ty);
+      const dx = x - cx;
+      const dy = y - cy;
+      const a = (-n(el.rotation) * Math.PI) / 180;
+      const rx = dx * Math.cos(a) - dy * Math.sin(a);
+      const ry = dx * Math.sin(a) + dy * Math.cos(a);
+      return { x: rx / s + n(el.rawWidth) / 2, y: ry / s + n(el.rawHeight) / 2 };
+    }
+
+    function thermalToImagePoint(tx, ty) {
+      const w = el.canvas.width;
+      const h = el.canvas.height;
+      const s = n(el.scaleOverlay) / 100;
+      const cx = w / 2 + n(el.tx);
+      const cy = h / 2 + n(el.ty);
+      const dx = (tx - n(el.rawWidth) / 2) * s;
+      const dy = (ty - n(el.rawHeight) / 2) * s;
+      const a = (n(el.rotation) * Math.PI) / 180;
+      return {
+        x: cx + dx * Math.cos(a) - dy * Math.sin(a),
+        y: cy + dx * Math.sin(a) + dy * Math.cos(a)
+      };
+    }
+
+    function getActiveRoi() {
+      return state.rois.find(roi => roi.id === state.activeRoiId) || null;
+    }
+
+    function findRoiAtPoint(p) {
+      for (let i = state.rois.length - 1; i >= 0; i--) {
+        const r = state.rois[i];
+        if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return r;
+      }
+      return null;
+    }
+
+    function normalizeRoi(roi) {
+      if (roi.w < 0) { roi.x += roi.w; roi.w = Math.abs(roi.w); }
+      if (roi.h < 0) { roi.y += roi.h; roi.h = Math.abs(roi.h); }
+    }
+
+    function getRoiStats(roi = getActiveRoi()) {
+      if (!roi || !state.thermalData) return null;
+      const r = roi;
+      const x0 = Math.floor(r.x);
+      const y0 = Math.floor(r.y);
+      const x1 = Math.ceil(r.x + r.w);
+      const y1 = Math.ceil(r.y + r.h);
+      const width = n(el.rawWidth);
+      const height = n(el.rawHeight);
+      let min = Infinity;
+      let max = -Infinity;
+      let minThermalPoint = null;
+      let maxThermalPoint = null;
+      let minImagePoint = null;
+      let maxImagePoint = null;
+      let sum = 0;
+      let count = 0;
+
+      for (let y = y0; y <= y1; y += 2) {
+        for (let x = x0; x <= x1; x += 2) {
+          const pt = imageToThermalPoint(x, y);
+          const tx = Math.floor(pt.x);
+          const ty = Math.floor(pt.y);
+          if (tx < 0 || ty < 0 || tx >= width || ty >= height) continue;
+          const v = state.thermalData[ty * width + tx];
+          if (!Number.isFinite(v)) continue;
+          if (v < min) {
+            min = v;
+            minThermalPoint = { x: tx, y: ty };
+            minImagePoint = { x, y };
+          }
+          if (v > max) {
+            max = v;
+            maxThermalPoint = { x: tx, y: ty };
+            maxImagePoint = { x, y };
+          }
+          sum += v;
+          count++;
+        }
+      }
+
+      if (!count) return null;
+      return { min, max, avg: sum / count, count, minThermalPoint, maxThermalPoint, minImagePoint, maxImagePoint };
+    }
+
+    function getRoiText(roi = getActiveRoi(), stats = getRoiStats(roi)) {
+      if (!roi) return "ROI: none";
+      if (!stats) return `${roi.name}: no thermal data`;
+      return `${roi.name} | Min ${stats.min.toFixed(1)}°C / Avg ${stats.avg.toFixed(1)}°C / Max ${stats.max.toFixed(1)}°C`; 
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
+    }
+
+    function getReportRowsHtml() {
+      if (!state.rois.length) return '<tr><td colspan="12">No ROI yet. Draw an ROI on the overlay canvas.</td></tr>';
+      return state.rois.map(roi => {
+        const stats = getRoiStats(roi);
+        const activeClass = roi.id === state.activeRoiId ? ' class="active-row"' : '';
+        const name = escapeHtml(roi.name || `ROI ${roi.id}`);
+        const comment = escapeHtml(roi.comment || "");
+        const showMinChecked = roi.showMin !== false ? 'checked' : '';
+        const showMaxChecked = roi.showMax !== false ? 'checked' : '';
+        const nameInput = `<input class="editable-cell-input" data-roi-name="${roi.id}" value="${name}" placeholder="ROI name">`;
+        const commentInput = `<textarea class="editable-cell-textarea" data-roi-comment="${roi.id}" placeholder="Observation / comment">${comment}</textarea>`;
+        const showMinInput = `<input type="checkbox" data-roi-show-min="${roi.id}" ${showMinChecked}>`;
+        const showMaxInput = `<input type="checkbox" data-roi-show-max="${roi.id}" ${showMaxChecked}>`;
+        if (!stats) {
+          return `<tr${activeClass}><td>${nameInput}</td><td colspan="7">No thermal samples inside this ROI. Check alignment or thermal layer coverage.</td><td style="text-align:center">${showMinInput}</td><td style="text-align:center">${showMaxInput}</td><td>${commentInput}</td><td><button class="small-btn" data-select-roi="${roi.id}">Select</button> <button class="small-btn danger" data-delete-roi="${roi.id}">Delete</button></td></tr>`;
+        }
+        return `<tr${activeClass}>
+          <td>${nameInput}</td>
+          <td>${stats.min.toFixed(1)} °C</td>
+          <td>${stats.avg.toFixed(1)} °C</td>
+          <td>${stats.max.toFixed(1)} °C</td>
+          <td>${stats.count.toLocaleString()} px</td>
+          <td>x${stats.minThermalPoint.x}, y${stats.minThermalPoint.y}</td>
+          <td>x${stats.maxThermalPoint.x}, y${stats.maxThermalPoint.y}</td>
+          <td>${Math.round(roi.w)} × ${Math.round(roi.h)} px</td>
+          <td style="text-align:center">${showMinInput}</td>
+          <td style="text-align:center">${showMaxInput}</td>
+          <td>${commentInput}</td>
+          <td><button class="small-btn" data-select-roi="${roi.id}">Select</button> <button class="small-btn danger" data-delete-roi="${roi.id}">Delete</button></td>
+        </tr>`;
+      }).join("");
+    }
+
+    function isEditingRoiTable() {
+      const active = document.activeElement;
+      return !!(
+        active &&
+        el.roiTableBody &&
+        el.roiTableBody.contains(active) &&
+        active.matches("[data-roi-name], [data-roi-comment], [data-roi-show-min], [data-roi-show-max]")
+      );
+    }
+
+    function updateReport() {
+      if (!el.roiTableBody) return;
+
+      // Do not rebuild the ROI table while the user is typing or toggling a field.
+      // Rebuilding innerHTML destroys the focused input/checkbox and makes edits appear impossible.
+      if (!isEditingRoiTable()) {
+        el.roiTableBody.innerHTML = getReportRowsHtml();
+      }
+      const validStats = state.rois.map(roi => getRoiStats(roi)).filter(Boolean);
+      if (!state.rois.length) {
+        el.reportPreview.textContent = "Report preview will update after ROI is drawn.";
+        return;
+      }
+      if (!validStats.length) {
+        el.reportPreview.textContent = `${state.rois.length} ROI(s) created, but no valid thermal samples are inside the selected boxes.`;
+        return;
+      }
+      const globalMin = Math.min(...validStats.map(s => s.min));
+      const globalMax = Math.max(...validStats.map(s => s.max));
+      const avg = validStats.reduce((sum, s) => sum + s.avg, 0) / validStats.length;
+      el.reportPreview.textContent = `Report summary: ${state.rois.length} ROI(s), global min ${globalMin.toFixed(1)} °C, average of ROI averages ${avg.toFixed(1)} °C, global max ${globalMax.toFixed(1)} °C.`;
+    }
+
+
+    function getReportDetailValue(key) {
+      const field = {
+        title: el.reportTitle,
+        date: el.reportDate,
+        inspector: el.reportInspector,
+        asset: el.reportAsset,
+        location: el.reportLocation,
+        reference: el.reportReference,
+        comment: el.reportComment
+      }[key];
+      return field ? field.value.trim() : "";
+    }
+
+    function syncReportDetailsFromFields() {
+      state.report.title = getReportDetailValue("title") || "Thermal + RGB ROI Inspection Report";
+      state.report.date = getReportDetailValue("date");
+      state.report.inspector = getReportDetailValue("inspector");
+      state.report.asset = getReportDetailValue("asset");
+      state.report.location = getReportDetailValue("location");
+      state.report.reference = getReportDetailValue("reference");
+      state.report.comment = getReportDetailValue("comment");
+    }
+
+    function getReportRowsForExport() {
+      if (!state.rois.length) return '<tr><td colspan="11">No ROI yet.</td></tr>';
+      return state.rois.map(roi => {
+        const stats = getRoiStats(roi);
+        const name = escapeHtml(roi.name || `ROI ${roi.id}`);
+        const comment = escapeHtml(roi.comment || "").split("\n").join("<br>");
+        if (!stats) {
+          return `<tr><td>${name}</td><td colspan="7">No thermal samples inside this ROI.</td><td>${roi.showMin !== false ? 'Yes' : 'No'}</td><td>${roi.showMax !== false ? 'Yes' : 'No'}</td><td>${comment}</td></tr>`;
+        }
+        return `<tr>
+          <td><strong>${name}</strong></td>
+          <td>${stats.min.toFixed(1)} °C</td>
+          <td>${stats.avg.toFixed(1)} °C</td>
+          <td>${stats.max.toFixed(1)} °C</td>
+          <td>${stats.count.toLocaleString()} px</td>
+          <td>x${stats.minThermalPoint.x}, y${stats.minThermalPoint.y}</td>
+          <td>x${stats.maxThermalPoint.x}, y${stats.maxThermalPoint.y}</td>
+          <td>${Math.round(roi.w)} × ${Math.round(roi.h)} px</td>
+          <td>${roi.showMin !== false ? 'Yes' : 'No'}</td>
+          <td>${roi.showMax !== false ? 'Yes' : 'No'}</td>
+          <td>${comment}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function createReportHtml() {
+      syncReportDetailsFromFields();
+      draw();
+      const imageUrl = el.canvas.toDataURL("image/png");
+      const now = new Date().toLocaleString();
+      const rows = getReportRowsForExport();
+      const r = state.report;
+      const commentHtml = escapeHtml(r.comment || "").split("\n").join("<br>");
+      const metaRows = [
+        ["Generated", now],
+        ["Inspection date", r.date || "Not specified"],
+        ["Inspector", r.inspector || "Not specified"],
+        ["Asset / Equipment", r.asset || "Not specified"],
+        ["Location", r.location || "Not specified"],
+        ["Reference", r.reference || "Not specified"],
+        ["Thermal file", state.rawName || "Not specified"],
+        ["Thermal settings", `${el.rawWidth.value} × ${el.rawHeight.value}, ${el.rawType.value}, ${el.endian.value} endian, scale ${el.tempScale.value}, offset ${el.tempOffset.value}`]
+      ].map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join("");
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${escapeHtml(r.title || "Thermal ROI Report")}</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;margin:28px;color:#0f172a;}
+h1{margin-bottom:12px;}
+.meta{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px;}
+.meta th{width:180px;background:#f8fafc;}
+.comment{border:1px solid #d8e0ea;border-radius:12px;padding:12px;margin:16px 0;background:#f8fafc;line-height:1.45;}
+img{max-width:100%;border:1px solid #d8e0ea;border-radius:12px;}
+table{width:100%;border-collapse:collapse;margin-top:18px;font-size:13px;}
+th,td{border:1px solid #d8e0ea;padding:8px;text-align:left;vertical-align:top;}
+th{background:#f8fafc;}
+@media print{button{display:none;} body{margin:12mm;}}
+</style>
+</head>
+<body>
+<h1>${escapeHtml(r.title || "Thermal + RGB ROI Inspection Report")}</h1>
+<table class="meta"><tbody>${metaRows}</tbody></table>
+${commentHtml ? `<div class="comment"><strong>Report summary / general comment</strong><br>${commentHtml}</div>` : ""}
+<img src="${imageUrl}" alt="Thermal overlay with ROI">
+<table>
+<thead><tr><th>ROI</th><th>Min</th><th>Avg</th><th>Max</th><th>Samples</th><th>Min location</th><th>Max location</th><th>Size</th><th>Show MIN</th><th>Show MAX</th><th>Observation / Comment</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</body>
+</html>`;
+    }
+
+    function exportReportHtml() {
+      const blob = new Blob([createReportHtml()], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "thermal-roi-report.html";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function printReport() {
+      const win = window.open("", "_blank");
+      if (!win) {
+        alert("Popup was blocked. Please allow popups to print the report.");
+        return;
+      }
+      win.document.write(createReportHtml());
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 300);
+    }
+
+    function updateUi() {
+      updateFileSizeUi();
+      el.opacityValue.textContent = `${el.opacity.value}%`;
+      el.txValue.textContent = `${el.tx.value}px`;
+      el.tyValue.textContent = `${el.ty.value}px`;
+      el.scaleOverlayValue.textContent = `${el.scaleOverlay.value}%`;
+      el.rotationValue.textContent = `${el.rotation.value}°`;
+      el.lensK1Value.textContent = Number(el.lensK1.value).toFixed(4);
+      el.lensK2Value.textContent = Number(el.lensK2.value).toFixed(4);
+      el.lensCxValue.textContent = `${el.lensCx.value}%`;
+      el.lensCyValue.textContent = `${el.lensCy.value}%`; 
+      el.dataMinMax.textContent = `${state.dataMin.toFixed(2)} / ${state.dataMax.toFixed(2)}`;
+      el.thermalMetric.textContent = state.thermalData ? `${el.rawWidth.value} × ${el.rawHeight.value}` : "Not loaded";
+      el.rangeMetric.textContent = `${Number(el.rangeMin.value).toFixed(1)} to ${Number(el.rangeMax.value).toFixed(1)} °C`;
+      const activeRoi = getActiveRoi();
+      const stats = getRoiStats(activeRoi);
+      el.roiMinMetric.textContent = stats ? `${stats.min.toFixed(1)} °C` : (activeRoi ? "No data" : "Select ROI");
+      el.roiMinLocMetric.textContent = stats ? `Thermal x${stats.minThermalPoint.x}, y${stats.minThermalPoint.y}` : "—";
+      el.roiAvgMetric.textContent = stats ? `${stats.avg.toFixed(1)} °C` : (activeRoi ? "No data" : "Select ROI");
+      el.roiMaxMetric.textContent = stats ? `${stats.max.toFixed(1)} °C` : (activeRoi ? "No data" : "Select ROI");
+      el.roiMaxLocMetric.textContent = stats ? `Thermal x${stats.maxThermalPoint.x}, y${stats.maxThermalPoint.y}` : "—";
+      el.roiSampleMetric.textContent = stats ? `${stats.count.toLocaleString()} px` : (activeRoi ? "No data" : "Select ROI");
+      el.toggleThermalBtn.textContent = state.thermalVisible ? "Hide thermal layer" : "Show thermal layer";
+      updateReport();
+    }
+
+    function resetAlignment() {
+      el.opacity.value = 55;
+      el.tx.value = 0;
+      el.ty.value = 0;
+      el.scaleOverlay.value = 300;
+      el.rotation.value = 0;
+      draw();
+    }
+
+    function resetLensDistortion() {
+      el.lensK1.value = 0;
+      el.lensK2.value = -0.0230;
+      el.lensCx.value = 50;
+      el.lensCy.value = 50;
+      draw();
+    }
+
+    el.rgbInput.addEventListener("change", event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      el.rgbName.textContent = file.name;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const url = String(reader.result);
+        el.rgbPreview.src = url;
+        el.rgbPreview.style.display = "block";
+        const img = new Image();
+        img.onload = () => {
+          state.rgbImage = img;
+          draw();
+        };
+        img.onerror = () => alert("Could not load the RGB image. Please try another JPG or PNG file.");
+        img.src = url;
+      };
+      reader.onerror = () => alert("Could not read the RGB image file.");
+      reader.readAsDataURL(file);
+    });
+
+    el.rawInput.addEventListener("change", event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      state.rawName = file.name;
+      file.arrayBuffer().then(buffer => {
+        state.rawBuffer = buffer;
+        state.thermalData = null;
+        el.rawInfo.textContent = `${file.name} • ${buffer.byteLength.toLocaleString()} bytes`;
+        const detected = detectRawSettings(buffer.byteLength);
+        if (detected) {
+          el.rawWidth.value = detected.width;
+          el.rawHeight.value = detected.height;
+          el.rawType.value = detected.type;
+          updateFileSizeUi();
+          parseRaw(buffer);
+        } else {
+          updateUi();
+          draw();
+        }
+      }).catch(() => alert("Could not read the RAW thermal file."));
+    });
+
+    el.parseBtn.addEventListener("click", () => parseRaw());
+    el.exportBtn.addEventListener("click", () => {
+      const a = document.createElement("a");
+      a.href = el.canvas.toDataURL("image/png");
+      a.download = "thermal-rgb-overlay.png";
+      a.click();
+    });
+
+    el.resetTopBtn.addEventListener("click", resetAlignment);
+    el.resetAlignBtn.addEventListener("click", resetAlignment);
+    el.resetLensBtn.addEventListener("click", resetLensDistortion);
+    el.toggleThermalBtn.addEventListener("click", () => {
+      state.thermalVisible = !state.thermalVisible;
+      draw();
+    });
+    el.clearRoiBtn.addEventListener("click", () => {
+      state.rois = [];
+      state.activeRoiId = null;
+      draw();
+    });
+
+    el.deselectRoiBtn.addEventListener("click", () => {
+      state.activeRoiId = null;
+      draw();
+    });
+
+    el.deleteRoiBtn.addEventListener("click", () => {
+      if (!state.activeRoiId) return;
+      state.rois = state.rois.filter(roi => roi.id !== state.activeRoiId);
+      state.activeRoiId = state.rois.length ? state.rois[state.rois.length - 1].id : null;
+      draw();
+    });
+
+    el.refreshReportBtn.addEventListener("click", () => {
+      draw();
+    });
+
+    el.exportReportHtmlBtn.addEventListener("click", exportReportHtml);
+    el.printReportBtn.addEventListener("click", printReport);
+
+    el.roiTableBody.addEventListener("click", event => {
+      const selectBtn = event.target.closest("[data-select-roi]");
+      const deleteBtn = event.target.closest("[data-delete-roi]");
+      if (selectBtn) {
+        state.activeRoiId = Number(selectBtn.dataset.selectRoi);
+        draw();
+      }
+      if (deleteBtn) {
+        const id = Number(deleteBtn.dataset.deleteRoi);
+        state.rois = state.rois.filter(roi => roi.id !== id);
+        if (state.activeRoiId === id) state.activeRoiId = state.rois.length ? state.rois[state.rois.length - 1].id : null;
+        draw();
+      }
+    });
+
+
+    el.roiTableBody.addEventListener("input", event => {
+      const nameInput = event.target.closest("[data-roi-name]");
+      const commentInput = event.target.closest("[data-roi-comment]");
+      if (nameInput) {
+        const id = Number(nameInput.dataset.roiName);
+        const roi = state.rois.find(item => item.id === id);
+        if (roi) roi.name = nameInput.value;
+        state.activeRoiId = id;
+        draw();
+      }
+      if (commentInput) {
+        const id = Number(commentInput.dataset.roiComment);
+        const roi = state.rois.find(item => item.id === id);
+        if (roi) roi.comment = commentInput.value;
+        state.activeRoiId = id;
+      }
+    });
+
+    el.roiTableBody.addEventListener("focusout", event => {
+      if (event.target.closest("[data-roi-name], [data-roi-comment], [data-roi-show-min], [data-roi-show-max]")) {
+        updateReport();
+      }
+    });
+
+    el.roiTableBody.addEventListener("change", event => {
+      const showMinToggle = event.target.closest("[data-roi-show-min]");
+      const showMaxToggle = event.target.closest("[data-roi-show-max]");
+      if (showMinToggle) {
+        const id = Number(showMinToggle.dataset.roiShowMin);
+        const roi = state.rois.find(item => item.id === id);
+        if (roi) roi.showMin = showMinToggle.checked;
+        state.activeRoiId = id;
+        draw();
+        return;
+      }
+      if (showMaxToggle) {
+        const id = Number(showMaxToggle.dataset.roiShowMax);
+        const roi = state.rois.find(item => item.id === id);
+        if (roi) roi.showMax = showMaxToggle.checked;
+        state.activeRoiId = id;
+        draw();
+        return;
+      }
+      if (event.target.closest("[data-roi-name]") || event.target.closest("[data-roi-comment]")) {
+        draw();
+      }
+    });
+
+    [el.reportTitle, el.reportDate, el.reportInspector, el.reportAsset, el.reportLocation, el.reportReference, el.reportComment].forEach(input => {
+      input.addEventListener("input", () => {
+        syncReportDetailsFromFields();
+        updateReport();
+      });
+    });
+
+    el.canvas.addEventListener("mousedown", event => {
+      const p = getCanvasPoint(event);
+      const existing = findRoiAtPoint(p);
+      if (existing && !event.shiftKey) {
+        state.activeRoiId = existing.id;
+        state.isDrawing = false;
+        draw();
+        return;
+      }
+      const roi = {
+        id: state.nextRoiId++,
+        name: `ROI ${state.rois.length + 1}`,
+        x: p.x,
+        y: p.y,
+        w: 1,
+        h: 1,
+        comment: "",
+        showMin: true,
+        showMax: true
+      };
+      state.rois.push(roi);
+      state.activeRoiId = roi.id;
+      state.drawStart = p;
+      state.isDrawing = true;
+      draw();
+    });
+
+    el.canvas.addEventListener("mousemove", event => {
+      if (!state.isDrawing || !state.drawStart) return;
+      const p = getCanvasPoint(event);
+      const roi = getActiveRoi();
+      if (!roi) return;
+      roi.x = Math.min(state.drawStart.x, p.x);
+      roi.y = Math.min(state.drawStart.y, p.y);
+      roi.w = Math.abs(state.drawStart.x - p.x);
+      roi.h = Math.abs(state.drawStart.y - p.y);
+      draw();
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (state.isDrawing) {
+        const roi = getActiveRoi();
+        if (roi && (roi.w < 6 || roi.h < 6)) {
+          state.rois = state.rois.filter(r => r.id !== roi.id);
+          state.activeRoiId = state.rois.length ? state.rois[state.rois.length - 1].id : null;
+        }
+      }
+      state.isDrawing = false;
+      state.drawStart = null;
+      draw();
+    });
+
+    window.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !isEditingRoiTable()) {
+        state.activeRoiId = null;
+        draw();
+      }
+    });
+
+    const redrawInputs = [
+      el.rawWidth, el.rawHeight, el.rawType, el.endian, el.tempScale, el.tempOffset,
+      el.colormap, el.blendMode, el.invertMap, el.manualRange, el.rangeMin, el.rangeMax,
+      el.opacity, el.tx, el.ty, el.scaleOverlay, el.rotation,
+      el.lensK1, el.lensK2, el.lensCx, el.lensCy
+    ];
+
+    redrawInputs.forEach(input => {
+      input.addEventListener("input", () => {
+        updateFileSizeUi();
+        if ([el.tempScale, el.tempOffset, el.rawWidth, el.rawHeight, el.rawType, el.endian].includes(input) && state.rawBuffer) {
+          // User can press Load / Re-parse for RAW changes. Avoid slow auto-parse while typing.
+        }
+        draw();
+      });
+      input.addEventListener("change", () => {
+        updateFileSizeUi();
+        draw();
+      });
+    });
+
+    if (el.reportDate && !el.reportDate.value) {
+      el.reportDate.valueAsDate = new Date();
+      syncReportDetailsFromFields();
+    }
+
+    updateUi();
+    draw();
+  </script>
+</body>
+</html>
